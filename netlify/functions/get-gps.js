@@ -1,4 +1,4 @@
-const fs = require('fs')
+const fs = require('fs').promises
 const path = require('path')
 
 exports.handler = async () => {
@@ -9,7 +9,7 @@ exports.handler = async () => {
 
   try {
     const filePath = path.join(__dirname, '../../data/gps-data.json')
-    const data = fs.readFileSync(filePath, 'utf8')
+    const data = await fs.readFile(filePath, 'utf8')
 
     return {
       statusCode: 200,

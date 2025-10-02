@@ -1,14 +1,10 @@
-const fs = require('fs')
+const fs = require('fs').promises
 const path = require('path')
 
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json'
-  }
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' }
   }
 
   if (event.httpMethod !== 'POST') {
@@ -22,32 +18,21 @@ exports.handler = async (event) => {
   try {
     const { latitude, longitude } = JSON.parse(event.body)
 
-    if (!latitude || !longitude) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing lat/lon' })
-      }
-    }
-
     const newEntry = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
       timestamp: new Date().toISOString()
     }
 
-    console.log('GPS data received:', newEntry)
+    const filePath = path.join(__dirname, '../../data/gps-data.json')
+    await fs.writeFile(filePath, JSON.stringify(newEntry, null, 2))
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        data: newEntry
-      })
+      body: JSON.stringify({ success: true, data: newEntry })
     }
   } catch (error) {
-    console.error('Error:', error)
     return {
       statusCode: 500,
       headers,
