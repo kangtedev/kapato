@@ -1,4 +1,4 @@
-const { getStore } = require('@netlify/blobs')
+const https = require('https')
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -36,11 +36,40 @@ exports.handler = async (event, context) => {
       timestamp: new Date().toISOString()
     }
 
-    // Store data in Netlify Blobs
-    const store = getStore('gps-data')
-    await store.set('latest', JSON.stringify(newEntry))
+    // Store in GitHub Gist or use environment variable
+    // For now, just return the data and log it
+    console.log('GPS data received:', JSON.stringify(newEntry))
 
-    console.log('GPS data saved:', newEntry)
+    // Store in Netlify environment (you'll need to set GIST_TOKEN in Netlify)
+    if (process.env.GIST_ID && process.env.GIST_TOKEN) {
+      const gistData = JSON.stringify({
+        files: {
+          'gps-data.json': {
+            content: JSON.stringify(newEntry)
+          }
+        }
+      })
+
+      await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'api.github.com',
+          path: `/gists/${process.env.GIST_ID}`,
+          method: 'PATCH',
+          headers: {
+            'Authorization': `token ${process.env.GIST_TOKEN}`,
+            'User-Agent': 'Netlify-Function',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(gistData)
+          }
+        }, (res) => {
+          res.on('data', () => {})
+          res.on('end', resolve)
+        })
+        req.on('error', reject)
+        req.write(gistData)
+        req.end()
+      })
+    }
 
     return {
       statusCode: 200,
