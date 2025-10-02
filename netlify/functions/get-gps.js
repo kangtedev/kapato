@@ -1,54 +1,26 @@
-const https = require('https')
+const fs = require('fs')
+const path = require('path')
 
-exports.handler = async (event, context) => {
+exports.handler = async () => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json'
   }
 
   try {
-    // Fetch from GitHub Gist if configured
-    if (process.env.GIST_ID) {
-      const data = await new Promise((resolve, reject) => {
-        https.get({
-          hostname: 'api.github.com',
-          path: `/gists/${process.env.GIST_ID}`,
-          headers: {
-            'User-Agent': 'Netlify-Function'
-          }
-        }, (res) => {
-          let body = ''
-          res.on('data', chunk => body += chunk)
-          res.on('end', () => {
-            try {
-              const gist = JSON.parse(body)
-              const gpsData = gist.files['gps-data.json'].content
-              resolve(gpsData)
-            } catch (e) {
-              reject(e)
-            }
-          })
-        }).on('error', reject)
-      })
-
-      return {
-        statusCode: 200,
-        headers,
-        body: data
-      }
-    }
+    const filePath = path.join(__dirname, '../../data/gps-data.json')
+    const data = fs.readFileSync(filePath, 'utf8')
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ message: 'No GPS data yet. Configure GIST_ID in Netlify.' })
+      body: data
     }
   } catch (error) {
-    console.error('Error:', error)
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ message: 'No GPS data yet' })
     }
   }
 }
