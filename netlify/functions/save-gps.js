@@ -1,6 +1,3 @@
-const fs = require('fs').promises
-const path = require('path')
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -8,11 +5,15 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers }
+    return { statusCode: 200, headers, body: '' }
   }
 
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'POST only' }) }
+    return { 
+      statusCode: 405, 
+      headers, 
+      body: JSON.stringify({ error: 'POST only' }) 
+    }
   }
 
   try {
@@ -26,7 +27,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Create new entry
     const newEntry = {
       id: Date.now(),
       latitude: parseFloat(latitude),
@@ -34,19 +34,18 @@ exports.handler = async (event) => {
       timestamp: new Date().toISOString()
     }
 
-    // Note: Netlify functions are stateless, so this uses a simple approach
-    // For production, use a proper database or Netlify Blobs
-    
+    console.log('GPS data received:', newEntry) // For Netlify logs
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         success: true, 
-        data: newEntry,
-        note: 'Data received. For persistent storage, integrate a database service.'
+        data: newEntry 
       })
     }
   } catch (error) {
+    console.error('Error:', error)
     return {
       statusCode: 500,
       headers,
