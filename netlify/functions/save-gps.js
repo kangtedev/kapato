@@ -1,4 +1,6 @@
-exports.handler = async (event) => {
+const { getStore } = require('@netlify/blobs')
+
+exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json'
@@ -9,10 +11,10 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') {
-    return { 
-      statusCode: 405, 
-      headers, 
-      body: JSON.stringify({ error: 'POST only' }) 
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'POST only' })
     }
   }
 
@@ -34,14 +36,18 @@ exports.handler = async (event) => {
       timestamp: new Date().toISOString()
     }
 
-    console.log('GPS data received:', newEntry) // For Netlify logs
+    // Store data in Netlify Blobs
+    const store = getStore('gps-data')
+    await store.set('latest', JSON.stringify(newEntry))
+
+    console.log('GPS data saved:', newEntry)
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ 
-        success: true, 
-        data: newEntry 
+      body: JSON.stringify({
+        success: true,
+        data: newEntry
       })
     }
   } catch (error) {
