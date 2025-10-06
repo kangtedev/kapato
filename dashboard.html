@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kapato - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-500 via-purple-500 to-purple-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-5 py-5 flex justify-between items-center flex-wrap gap-4">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">🐃 Kapato Dashboard</h1>
+                <p id="ownerName" class="text-sm opacity-90">Welcome back!</p>
+            </div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                Logout
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-5 py-8">
+        <!-- Devices Grid -->
+        <div id="devicesContainer" class="text-center py-10 text-gray-500">
+            Loading your devices...
+        </div>
+
+        <!-- Location Detail Panel -->
+        <div id="locationPanel" class="hidden bg-white rounded-xl shadow-lg p-6 mt-8">
+            <!-- Panel Header -->
+            <div class="flex justify-between items-center pb-4 mb-6 border-b-2 border-gray-100">
+                <h2 id="panelDeviceName" class="text-xl font-semibold text-gray-800">Device Details</h2>
+                <button onclick="closeLocationPanel()" class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm transition-colors">
+                    Close
+                </button>
+            </div>
+
+            <!-- Current Location -->
+            <div class="bg-indigo-50 rounded-lg p-5 mb-6 border-l-4 border-indigo-500">
+                <div class="text-base font-semibold text-indigo-600 mb-3">📍 Current Location</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <div class="text-sm font-medium text-gray-700 mb-1">Latitude:</div>
+                        <div id="currentLat" class="text-gray-900">-</div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-gray-700 mb-1">Longitude:</div>
+                        <div id="currentLon" class="text-gray-900">-</div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-gray-700 mb-1">Last Updated:</div>
+                        <div id="currentTime" class="text-gray-900">-</div>
+                    </div>
+                    <div class="flex items-end">
+                        <a id="currentMapLink" href="#" target="_blank" class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            View on Google Maps
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location History -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">📊 Location History (Last 50)</h3>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 border-b-2 border-gray-200">#</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 border-b-2 border-gray-200">Latitude</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 border-b-2 border-gray-200">Longitude</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 border-b-2 border-gray-200">Timestamp</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 border-b-2 border-gray-200">Map</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="bg-white divide-y divide-gray-100">
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let owner = null;
+        let devices = [];
+        let selectedDeviceId = null;
+
+        // Check authentication
+        function checkAuth() {
+            const ownerData = sessionStorage.getItem('owner');
+            if (!ownerData) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            owner = JSON.parse(ownerData);
+            document.getElementById('ownerName').textContent = `Welcome, ${owner.name}!`;
+            return true;
+        }
+
+        // Logout
+        function logout() {
+            sessionStorage.removeItem('owner');
+            window.location.href = '/login.html';
+        }
+
+        // Load devices
+        async function loadDevices() {
+            if (!owner) return;
+
+            try {
+                const response = await fetch(`/.netlify/functions/get-owner-devices?owner_id=${owner.owner_id}`);
+                const data = await response.json();
+
+                if (data.success && data.devices) {
+                    devices = data.devices;
+                    renderDevices();
+                } else {
+                    showNoDevices();
+                }
+            } catch (error) {
+                console.error('Error loading devices:', error);
+                document.getElementById('devicesContainer').innerHTML = `
+                    <div class="text-center py-16 bg-white rounded-xl shadow-lg">
+                        <h2 class="text-xl font-semibold text-gray-600 mb-2">Error loading devices</h2>
+                        <p class="text-gray-500">Please try refreshing the page.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render devices
+        function renderDevices() {
+            const container = document.getElementById('devicesContainer');
+
+            if (devices.length === 0) {
+                showNoDevices();
+                return;
+            }
+
+            container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8';
+            container.innerHTML = devices.map(device => {
+                const isActive = device.is_active;
+                const hasLocation = device.latest_location;
+                const lastSeen = device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never';
+
+                return `
+                    <div onclick="selectDevice('${device.device_id}')" class="bg-white rounded-xl p-5 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer border-2 ${isActive ? 'border-transparent hover:border-indigo-500' : 'border-transparent opacity-60'}">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <div class="text-lg font-semibold text-gray-800">${device.device_name}</div>
+                                <div class="text-xs text-gray-400 mt-1">${device.device_id}</div>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${isActive ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div><span class="font-medium text-gray-800">Last Seen:</span> ${lastSeen}</div>
+                            <div><span class="font-medium text-gray-800">Update Interval:</span> ${device.update_interval}s</div>
+                            <div><span class="font-medium text-gray-800">SMS Alerts:</span> ${device.notify_sms ? 'Enabled' : 'Disabled'}</div>
+                            ${hasLocation ? `
+                                <div class="pt-2 border-t border-gray-100">
+                                    <div class="font-medium text-gray-800 mb-1">Current Location:</div>
+                                    <div class="text-xs">${device.latest_location.latitude.toFixed(6)}, ${device.latest_location.longitude.toFixed(6)}</div>
+                                </div>
+                                <a href="https://www.google.com/maps?q=${device.latest_location.latitude},${device.latest_location.longitude}"
+                                   target="_blank"
+                                   onclick="event.stopPropagation()"
+                                   class="inline-block mt-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors">
+                                    View on Map
+                                </a>
+                            ` : '<div class="text-gray-400 italic text-xs pt-2">No GPS data yet</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Show no devices message
+        function showNoDevices() {
+            document.getElementById('devicesContainer').innerHTML = `
+                <div class="text-center py-16 bg-white rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-600 mb-2">No devices found</h2>
+                    <p class="text-gray-500">You don't have any tracking devices yet.</p>
+                </div>
+            `;
+        }
+
+        // Select device and show details
+        async function selectDevice(deviceId) {
+            selectedDeviceId = deviceId;
+            const device = devices.find(d => d.device_id === deviceId);
+
+            if (!device) return;
+
+            // Update panel title
+            document.getElementById('panelDeviceName').textContent = device.device_name;
+
+            // Show current location
+            if (device.latest_location) {
+                const loc = device.latest_location;
+                document.getElementById('currentLat').textContent = loc.latitude.toFixed(6);
+                document.getElementById('currentLon').textContent = loc.longitude.toFixed(6);
+                document.getElementById('currentTime').textContent = new Date(loc.created_at).toLocaleString();
+                document.getElementById('currentMapLink').href = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+            } else {
+                document.getElementById('currentLat').textContent = 'No data';
+                document.getElementById('currentLon').textContent = 'No data';
+                document.getElementById('currentTime').textContent = 'No data';
+                document.getElementById('currentMapLink').href = '#';
+            }
+
+            // Load history
+            await loadDeviceHistory(deviceId);
+
+            // Show panel
+            document.getElementById('locationPanel').classList.remove('hidden');
+            document.getElementById('locationPanel').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Load device history
+        async function loadDeviceHistory(deviceId) {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading history...</td></tr>';
+
+            try {
+                const response = await fetch(`/.netlify/functions/get-device-history?device_id=${deviceId}&limit=50`);
+                const data = await response.json();
+
+                if (data.success && data.locations.length > 0) {
+                    tbody.innerHTML = data.locations.map((loc, index) => `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm text-gray-900">${index + 1}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">${loc.latitude.toFixed(6)}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">${loc.longitude.toFixed(6)}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">${new Date(loc.created_at).toLocaleString()}</td>
+                            <td class="px-4 py-3">
+                                <a href="https://www.google.com/maps?q=${loc.latitude},${loc.longitude}"
+                                   target="_blank"
+                                   class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No location history available</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-600">Error loading history</td></tr>';
+            }
+        }
+
+        // Close location panel
+        function closeLocationPanel() {
+            document.getElementById('locationPanel').classList.add('hidden');
+            selectedDeviceId = null;
+        }
+
+        // Auto-refresh devices every 10 seconds
+        setInterval(() => {
+            loadDevices();
+            if (selectedDeviceId) {
+                selectDevice(selectedDeviceId);
+            }
+        }, 10000);
+
+        // Initialize
+        if (checkAuth()) {
+            loadDevices();
+        }
+    </script>
+</body>
+</html>
